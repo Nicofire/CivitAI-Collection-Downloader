@@ -1,12 +1,13 @@
+"""Module for downloading media files and saving metadata for CivitAI collections."""
 import os
 import sys
 import json
 import time
 import logging
-import requests
 import mimetypes
 from pathlib import Path
-from urllib.parse import urlparse
+# from urllib.parse import urlparse
+import requests
 
 from config import config
 
@@ -63,7 +64,7 @@ def create_download_directory(collection_info):
     download_dir = config.get('download_dir')
     if not download_dir:
         download_dir = os.path.join(os.path.expanduser('~'), 'Pictures', 'CivitAI')
-        logger.warning(f"Download directory not found in config, using default: {download_dir}")
+        logger.warning("Download directory not found in config, using default: %s", download_dir)
 
     base_dir = Path(download_dir)
 
@@ -73,7 +74,7 @@ def create_download_directory(collection_info):
         collection_id = "unknown-collection"
         if len(sys.argv) > 2 and sys.argv[1] in ['-c', '--collection']:
             collection_id = sys.argv[2]
-        logger.warning(f"No collection info available, using ID: {collection_id}")
+        logger.warning("No collection info available, using ID: %s", collection_id)
         download_dir = base_dir / str(collection_id)
     elif isinstance(collection_info, dict) and "collection" in collection_info:
         # Full collection object from API
@@ -95,7 +96,7 @@ def create_download_directory(collection_info):
     # Create the directory
     download_dir.mkdir(parents=True, exist_ok=True)
 
-    logger.info(f"Created download directory: {download_dir}")
+    logger.info("Created download directory: %s", download_dir)
     return download_dir
 
 def download_file(url, output_path, mime_type=None, max_retries=3, api_key=None):
@@ -113,46 +114,46 @@ def download_file(url, output_path, mime_type=None, max_retries=3, api_key=None)
         # Construct URL exactly like the original script
         original_url = url
         url = f"https://image.civitai.com/{api_key}/{url}/{filename}"
-        logger.debug(f"Constructed download URL from '{original_url}' to '{url}'")
+        logger.debug("Constructed download URL from '%s' to '%s'", original_url, url)
 
-    logger.info(f"Downloading file to {output_path}")
-    logger.debug(f"Download URL: {url}")
+    logger.info("Downloading file to %s", output_path)
+    logger.debug("Download URL: %s", url)
 
     for attempt in range(max_retries + 1):
         try:
             # Simple request without session, exactly like original script
-            logger.debug(f"Download attempt {attempt+1}/{max_retries+1}")
-            with requests.get(url, stream=True) as response:
-                logger.debug(f"Response status: {response.status_code}")
-                logger.debug(f"Response headers: {dict(response.headers)}")
+            logger.debug("Download attempt %d/%d", attempt+1, max_retries+1)
+            with requests.get(url, stream=True, timeout=30) as response:
+                logger.debug("Response status: %s", response.status_code)
+                logger.debug("Response headers: %s", dict(response.headers))
                 response.raise_for_status()
 
                 # Check if MIME type matches expected
                 content_type = response.headers.get('Content-Type', '')
                 if mime_type and content_type and not content_type.startswith(mime_type):
-                    logger.warning(f"MIME type mismatch. Expected: {mime_type}, Got: {content_type}")
+                    logger.warning("MIME type mismatch. Expected: %s, Got: %s", mime_type, content_type)
 
                 # Save the file in chunks like the original script
-                logger.debug(f"Writing file to {output_path}")
+                logger.debug("Writing file to %s", output_path)
                 with open(output_path, 'wb') as f:
                     for chunk in response.iter_content():
                         f.write(chunk)
 
-            logger.debug(f"Successfully downloaded file to {output_path}")
+            logger.debug("Successfully downloaded file to %s", output_path)
             return True
 
         except (requests.RequestException, OSError) as e:
-            logger.error(f"Error downloading file (attempt {attempt+1}/{max_retries+1}): {e}")
+            logger.error("Error downloading file (attempt %d/%d): %s", attempt+1, max_retries+1, e)
             if 'response' in locals():
-                logger.debug(f"Response headers: {dict(response.headers) if hasattr(response, 'headers') else 'No headers'}")
-                logger.debug(f"Response content: {response.text[:200] if hasattr(response, 'text') else 'No content'}")
+                logger.debug("Response headers: %s", dict(response.headers) if hasattr(response, 'headers') else 'No headers')
+                logger.debug("Response content: %s", response.text[:200] if hasattr(response, 'text') else 'No content')
 
             if attempt < max_retries:
                 delay = attempt + 1  # Incremental backoff
-                logger.info(f"Retrying download in {delay} seconds...")
+                logger.info("Retrying download in %d seconds...", delay)
                 time.sleep(delay)
             else:
-                logger.error(f"Download failed after {max_retries+1} attempts")
+                logger.error("Download failed after %d attempts", max_retries+1)
                 return False
 
 def download_media(media_data, download_dir, api_key=None):
@@ -163,7 +164,7 @@ def download_media(media_data, download_dir, api_key=None):
     mime_type = media_data.get("mimeType", "image/jpeg")
 
     if not media_url:
-        logger.error(f"No URL found for media {media_id}")
+        logger.error("No URL found for media %s", media_id)
         return None
 
     # Sanitize filename and add proper extension
@@ -177,7 +178,7 @@ def download_media(media_data, download_dir, api_key=None):
 
     # Skip if file already exists
     if file_path.exists():
-        logger.info(f"File already exists: {file_path}")
+        logger.info("File already exists: %s", file_path)
         return file_path
 
     # Download the file
@@ -199,8 +200,8 @@ def save_metadata(metadata, file_path):
     try:
         with open(file_path, 'w', encoding='utf-8') as f:
             json.dump(metadata, f, indent=2, ensure_ascii=False)
-        logger.info(f"Saved metadata to {file_path}")
+        logger.info("Saved metadata to %s", file_path)
         return True
     except Exception as e:
-        logger.error(f"Error saving metadata to {file_path}: {e}")
+        logger.error("Error saving metadata to %s: %s", file_path, e)
         return False

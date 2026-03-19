@@ -1,4 +1,4 @@
-# config.py
+"""Configuration management for CivitAI Downloader, including loading, saving, and prompting for user input."""
 
 import os
 import json
@@ -16,16 +16,20 @@ DEFAULT_CONFIG = {
 }
 
 class Configuration:
+    """Class to manage configuration settings for the CivitAI Downloader."""
     def __init__(self):
         self._data = DEFAULT_CONFIG.copy()
 
     def get(self, key, default=None):
+        """Get a configuration value with an optional default."""
         return self._data.get(key, default)
 
     def set(self, key, value):
+        """Set a configuration value."""
         self._data[key] = value
 
     def update(self, new_data):
+        """Update the configuration with a dictionary of new values."""
         self._data.update(new_data)
 
     def __getitem__(self, key):
@@ -40,8 +44,13 @@ class Configuration:
     def __str__(self):
         return str(self._data)
 
+    def to_dict(self):
+        """Return the configuration data as a dictionary."""
+        return self._data.copy()
+
 config = Configuration()
 def prompt_for_config():
+    """Prompt the user for necessary configuration settings if they are missing or invalid."""
     print("\n=== CivitAI Downloader Configuration ===")
     api_key = input("Please enter your CivitAI API key: ").strip()
 
@@ -60,8 +69,9 @@ def prompt_for_config():
     }
 
 def save_config(config_data, config_file):
+    """Save the configuration data to a JSON file."""
     try:
-        with open(config_file, 'w') as f:
+        with open(config_file, 'w', encoding='utf-8') as f:
             json.dump(config_data, f, indent=4)
         print(f"Configuration saved to {config_file}")
         return True
@@ -70,6 +80,7 @@ def save_config(config_data, config_file):
         return False
 
 def init_config(config_path=None):
+    """Initialize configuration by loading from file or prompting user input if necessary."""
     if config_path:
         config_file = Path(config_path)
     else:
@@ -83,7 +94,7 @@ def init_config(config_path=None):
     if config_file.exists():
         try:
             print("Found existing config file, loading...")
-            with open(config_file, 'r') as f:
+            with open(config_file, 'r', encoding='utf-8') as f:
                 loaded_config = json.load(f)
                 print(f"Loaded config contents: {loaded_config}")
                 if loaded_config:
@@ -104,7 +115,7 @@ def init_config(config_path=None):
     if need_user_input:
         user_inputs = prompt_for_config()
         config.update(user_inputs)
-        save_config(config._data, config_file)
+        save_config(config.to_dict(), config_file)
 
     os.makedirs(config['download_dir'], exist_ok=True)
     os.makedirs(config['log_dir'], exist_ok=True)
@@ -112,6 +123,7 @@ def init_config(config_path=None):
     return config
 
 def setup_logging():
+    """Set up logging to both console and rotating file handler based on configuration settings."""
     log_dir = Path(config['log_dir'])
     log_dir.mkdir(parents=True, exist_ok=True)
 
@@ -136,10 +148,11 @@ def setup_logging():
     file_handler.setFormatter(file_format)
     logger.addHandler(file_handler)
 
-    logging.debug(f"Logging level set to {config['log_level']}")
+    logging.debug("Logging level set to %s", config['log_level'])
     return logger
 
 def create_direct_config():
+    """Directly create a configuration file by prompting the user for input."""
     config_dir = Path(os.path.expanduser('~'), '.civitai_downloader')
     config_file = config_dir / 'config.json'
     config_dir.mkdir(parents=True, exist_ok=True)
@@ -155,7 +168,7 @@ def create_direct_config():
     }
 
     try:
-        with open(config_file, 'w') as f:
+        with open(config_file, 'w', encoding='utf-8') as f:
             json.dump(simple_config, f, indent=4)
         print(f"Configuration saved to {config_file}")
         return True
@@ -164,7 +177,7 @@ def create_direct_config():
         return False
 
     try:
-        with open(config_file, 'w') as f:
+        with open(config_file, 'w', encoding='utf-8') as f:
             json.dump(simple_config, f, indent=4)
         print(f"Configuration saved to {config_file}")
         return True
@@ -180,7 +193,7 @@ def create_direct_config():
 
     # Save the configuration
     try:
-        with open(config_file, 'w') as f:
+        with open(config_file, 'w', encoding='utf-8') as f:
             json.dump(simple_config, f, indent=4)
         print(f"Configuration saved to {config_file}")
         return True
