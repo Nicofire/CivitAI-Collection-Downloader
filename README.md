@@ -14,6 +14,7 @@ This application allows you to easily download content from the CivitAI platform
 
 - Images and videos from collections
 - Images and videos from posts
+- All unique posts referenced by a collection
 - Associated metadata (prompts, models used, tags, etc.)
 - Complete collection/post information
 
@@ -22,6 +23,7 @@ All content is organized into a structured directory hierarchy for easy browsing
 ## Features
 
 - **Collection and Post Support**: Download from individual CivitAI collections and posts, or process multiple IDs in a single run
+- **Collection-to-Posts Mode**: Download all unique posts contained in one or more collections
 - **Complete Metadata**: Automatically retrieves and saves generation prompts, models used, tags, and other details
 - **Reliable Downloads**: Built-in retry logic for handling network errors and interruptions
 - **Flexible Configuration**: Customizable download locations and behavior
@@ -83,6 +85,12 @@ To download media from a post:
 python main.py --post 67890
 ```
 
+To download all unique posts from a collection:
+
+```bash
+python main.py --collection-posts 12345
+```
+
 ### Multiple IDs
 
 You can download multiple collections or posts in a single command:
@@ -94,9 +102,9 @@ python main.py --collection 12345 23456 34567
 ### Command Line Options
 
 ```
-usage: main.py [-h] (-c COLLECTION [COLLECTION ...] | -p POST [POST ...]) [-o OUTPUT] [-v] [--no-metadata] [--dry-run]
+usage: main.py [-h] (-c COLLECTION [COLLECTION ...] | -p POST [POST ...] | -cp COLLECTION_POSTS [COLLECTION_POSTS ...]) [-o OUTPUT] [-v] [--no-metadata] [--dry-run]
 
-Download images, videos, and metadata from CivitAI collections and posts.
+Download images, videos, and metadata from CivitAI posts, image collections, or post collections.
 
 options:
   -h, --help            show this help message and exit
@@ -104,6 +112,8 @@ options:
                         Collection ID(s) to download. Can specify multiple IDs.
   -p POST [POST ...], --post POST [POST ...]
                         Post ID(s) to download. Can specify multiple IDs.
+  -cp COLLECTION_POSTS [COLLECTION_POSTS ...], --collection-posts COLLECTION_POSTS [COLLECTION_POSTS ...]
+                        Collection ID(s) where all unique posts should be downloaded.
   -o OUTPUT, --output OUTPUT
                         Override default download location
   -v, --verbose         Enable verbose output
@@ -123,6 +133,12 @@ Download a post to a custom directory:
 
 ```bash
 python main.py --post 67890 --output ~/Downloads/CivitAI_Post
+```
+
+Download all posts referenced in a collection:
+
+```bash
+python main.py --collection-posts 12345
 ```
 
 Preview what would be downloaded from multiple collections:

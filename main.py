@@ -14,11 +14,12 @@ from downloader import create_download_directory, download_media, save_metadata,
 def parse_arguments():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
-        description="Download images, videos, and metadata from CivitAI collections and posts."
+        description="Download images, videos, and metadata from CivitAI posts, image collections, or post collections."
     )
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("-c", "--collection", type=str, nargs='+', help="Collection ID(s) to download. Can specify multiple IDs.")
     group.add_argument("-p", "--post", type=str, nargs='+', help="Post ID(s) to download. Can specify multiple IDs.")
+    group.add_argument("-cp", "--collection-posts", type=str, nargs='+', help="Collection ID(s) where all unique posts should be downloaded.")
     
     parser.add_argument("-o", "--output", type=str, help="Override default download location")
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose output")
@@ -82,13 +83,13 @@ def process_collection(api, collection_id, dry_run=False, skip_metadata=False, a
         logging.error(f"Error processing collection {collection_id}: {e}")
         return False
 
-def process_post(api, post_id, dry_run=False, skip_metadata=False, api_key=None):
+def process_post(api, post_id, dry_run=False, skip_metadata=False, api_key=None, base_output_dir=None):
     post = api.get_post_by_id(post_id)
     if not post:
         logging.error(f"Failed to get post with ID: {post_id}")
         return False
 
-    download_dir_base = config.get('download_dir')
+    download_dir_base = base_output_dir if base_output_dir is not None else config.get('download_dir')
     if not download_dir_base:
         download_dir_base = os.path.join(os.path.expanduser('~'), 'Pictures', 'CivitAI')
         logging.warning(f"Download directory not found in config, using default: {download_dir_base}")
@@ -141,6 +142,71 @@ def process_post(api, post_id, dry_run=False, skip_metadata=False, api_key=None)
     logging.info(f"Successfully downloaded {len(downloaded_items)} of {len(media_items)} items from post {post_id}")
     return True
 
+def process_collection_posts(api, collection_id, dry_run=False, skip_metadata=False, api_key=None):
+    """Download all unique posts referenced by media in a collection."""
+    try:
+        collection_data = api.get_collection_by_id(collection_id)
+        if collection_data:
+            collection_dir = create_download_directory(collection_data)
+            collection_name = collection_data.get("collection", {}).get("name", f"Collection-{collection_id}")
+        else:
+            collection_dir = create_download_directory(collection_id)
+            collection_name = f"Collection-{collection_id}"
+
+        posts = api.get_all_posts_in_collection(collection_id)
+        if not posts:
+            logging.error(f"No posts found in collection: {collection_id}")
+            return False
+
+        post_ids = []
+        seen_post_ids = set()
+
+        for item in posts:
+            post_id = item.get("id")
+            if post_id is not None and post_id not in seen_post_ids:
+                seen_post_ids.add(post_id)
+                post_ids.append(post_id)
+
+        if not post_ids:
+            logging.error(f"No posts found in collection: {collection_id}")
+            return False
+
+        logging.info(f"Found {len(post_ids)} unique posts in collection {collection_id}")
+
+        successful_posts = 0
+        for idx, post_id in enumerate(post_ids, start=1):
+            logging.info(f"Processing post {idx}/{len(post_ids)} from collection {collection_id}: {post_id}")
+            post_success = process_post(
+                api,
+                str(post_id),
+                dry_run=dry_run,
+                skip_metadata=skip_metadata,
+                api_key=api_key,
+                base_output_dir=collection_dir
+            )
+            if post_success:
+                successful_posts += 1
+
+        if not skip_metadata and not dry_run:
+            collection_posts_metadata = {
+                "id": collection_id,
+                "name": collection_name,
+                "post_count": len(post_ids),
+                "successful_posts": successful_posts,
+                "posts": [str(pid) for pid in post_ids]
+            }
+            metadata_path = Path(collection_dir) / "collection_posts_metadata.json"
+            save_metadata(collection_posts_metadata, metadata_path)
+
+        logging.info(
+            f"Successfully processed {successful_posts} of {len(post_ids)} posts from collection {collection_id}"
+        )
+        return successful_posts == len(post_ids)
+
+    except Exception as e:
+        logging.error(f"Error processing collection posts {collection_id}: {e}")
+        return False
+
 def main():
     """Main function to run the CivitAI downloader."""
     # Parse command line arguments
@@ -177,6 +243,12 @@ def main():
             for collection_id in args.collection:
                 logger.info(f"Processing collection: {collection_id}")
                 collection_success = process_collection(api, collection_id, args.dry_run, args.no_metadata, api_key)
+                success = success and collection_success  # Only stays True if all succeed
+
+        elif args.collection_posts:
+            for collection_id in args.collection_posts:
+                logger.info(f"Processing collection as posts: {collection_id}")
+                collection_success = process_collection_posts(api, collection_id, args.dry_run, args.no_metadata, api_key)
                 success = success and collection_success  # Only stays True if all succeed
                 
         elif args.post:

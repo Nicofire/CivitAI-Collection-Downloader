@@ -146,6 +146,69 @@ class CivitaiAPI:
         
         logger.info(f"Retrieved a total of {len(all_images)} images from collection {collection_id}")
         return all_images
+
+    def get_posts_in_collection(self, collection_id, cursor=None):
+        """Get posts in a collection with pagination support."""
+        request_data = {
+            "json": {
+                "collectionId": int(collection_id),
+                "period": "AllTime",
+                "sort": "Newest",
+                "cursor": cursor,
+                "authed": True
+            }
+        }
+
+        if cursor is None:
+            request_data["meta"] = {"values": {"cursor": ["undefined"]}}
+
+        encoded_input = quote(json.dumps(request_data, separators=(',', ':')))
+        url = f"{self.BASE_URL}/post.getInfinite?input={encoded_input}"
+
+        logger.info(f"Fetching posts in collection {collection_id}{' with cursor' if cursor else ''}")
+
+        try:
+            response = requests.get(url, headers=self.headers)
+            response.raise_for_status()
+            result = response.json()
+
+            items = result.get('result', {}).get('data', {}).get('json', {}).get('items', [])
+            next_cursor = result.get('result', {}).get('data', {}).get('json', {}).get('nextCursor')
+
+            logger.debug(f"Retrieved {len(items)} posts, next cursor: {next_cursor}")
+            return {
+                "items": items,
+                "nextCursor": next_cursor
+            }
+        except Exception as e:
+            logger.error(f"Error fetching posts from collection {collection_id}: {e}")
+            if 'response' in locals():
+                logger.error(f"Response status: {response.status_code}")
+                logger.error(f"Response content: {response.text[:500]}")
+            return {"items": [], "nextCursor": None}
+
+    def get_all_posts_in_collection(self, collection_id):
+        """Get all posts in a collection by handling pagination."""
+        all_posts = []
+        cursor = None
+
+        logger.info(f"Starting retrieval of all posts from collection {collection_id}")
+
+        while True:
+            result = self.get_posts_in_collection(collection_id, cursor)
+            if not result or not result.get("items"):
+                if not all_posts:
+                    logger.error(f"No posts found in collection {collection_id}")
+                break
+
+            all_posts.extend(result.get("items", []))
+            cursor = result.get("nextCursor")
+
+            if not cursor:
+                break
+
+        logger.info(f"Retrieved a total of {len(all_posts)} posts from collection {collection_id}")
+        return all_posts
     
     def get_post_by_id(self, post_id):
         """Get details of a post by its ID."""
